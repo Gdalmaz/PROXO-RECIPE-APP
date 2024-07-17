@@ -1,0 +1,122 @@
+version: "3"
+services:
+  nginx:
+    image: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/recipe-app.conf:/etc/nginx/conf.d/recipe-app.conf
+    depends_on:
+      - Auth-App
+      - Taste-App
+      - app_postgres
+    networks:
+      - app_network
+
+  app_postgres:
+    image: postgres:latest
+    restart: no
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - app_postgres_vol:/var/lib/postgresql/data
+    networks:
+      - app_network
+
+  Taste-App:
+    image: cosmtrek/air:v1.44.0
+    restart: no
+    working_dir: /app
+    volumes:
+      - ./Taste-App:/app/.env
+      - ./.env:/app/.env
+    ports:
+      - "9090:80"
+    depends_on:
+      - app_postgres
+    environment:
+      GOFLAGS: "-buildvcs=false"
+    networks:
+      - app_network   
+
+  Mail-Services:
+    image: cosmtrek/air:v1.44.0
+    restart: no
+    working_dir: /app
+    volumes:
+      - ./Mail-Services:/app/.env
+      - ./.env:/app/.env
+    ports:
+      - "9091:80"
+    depends_on:
+      - Taste-App
+    environment:
+      GOFLAGS: "-buildvcs=false"
+    networks:
+      - app_network   
+
+  Auth-App:
+    image: cosmtrek/air:v1.44.0
+    restart: no
+    working_dir: /app
+    volumes:
+      - ./Auth-App:/app/.env
+      - ./.env:/app/.env
+    ports:
+      - "9092:80"
+    depends_on:
+      - app_postgres
+    environment:
+      GOFLAGS: "-buildvcs=false"
+    networks:
+      - app_network   
+      
+
+
+  App-Gateway:
+    image: cosmtrek/air:v1.44.0
+    restart: no
+    working_dir: /app
+    volumes:
+      - ./Gateway-App:/app
+    ports:
+      - "9095:80"
+    depends_on:
+      - app_postgres
+    environment:
+      GOFLAGS: "-buildvcs=false"
+    networks:
+      - app_network
+
+
+  redis:
+    image: redis:latest
+    restart: no
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app_network
+
+  rabbitmq:
+    image: rabbitmq:latest
+    restart: no
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - app_network
+
+volumes:
+  app_postgres_vol:
+  redis_data:
+
+networks:
+  app_network:
+    driver: bridge
